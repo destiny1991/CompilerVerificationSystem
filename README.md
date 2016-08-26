@@ -1,3 +1,3 @@
 # CompilerVerificationSystem
 
-当前开发分支！
+完成其它符号的实现！
