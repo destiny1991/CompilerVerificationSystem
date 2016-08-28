@@ -1,3 +1,3 @@
 # CompilerVerificationSystem
 
-当前开发分支！
+在前一阶段的基础上增添了表达式中能处理double类型的支持！
