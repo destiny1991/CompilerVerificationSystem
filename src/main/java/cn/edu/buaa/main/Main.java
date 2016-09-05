@@ -16,7 +16,7 @@ public class Main {
 	public static void main(String[] args) {
 		// 公共记录
 		Recorder recorder = new Recorder();
-		String fileName = "test5.c";
+		String fileName = "evenSum.c";
 
 		Lexer lexer = new Lexer(fileName, recorder);
 		lexer.outputSrc();
@@ -29,7 +29,7 @@ public class Main {
 		parser.runParser();
 		parser.outputParser();
 
-		Prover prover = new Prover(recorder);
+		Prover prover = new Prover(recorder, fileName);
 		Assembler assembler = new Assembler(parser.getTree(), recorder, prover);
 		assembler.runAssembler();
 		assembler.generateAssemblerFile(fileName);

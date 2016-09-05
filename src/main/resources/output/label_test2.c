@@ -26,6 +26,13 @@ int main() {                                      // 3
         c = b * b;                                // 3.13.2
     }                                             // 3.14
     printf("The biggest sqrt root of %d is %d", a, b);// 3.15
+
+
     
-    return 0;                                     // 3.16
+    for (a = 0; a < 10; a++) {                    // 3.16
+        b++;                                      // 3.16.1
+
+    }                                             // 3.17
+    
+    return 0;                                     // 3.18
 }                                                 // 4

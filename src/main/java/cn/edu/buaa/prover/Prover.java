@@ -28,19 +28,24 @@ public class Prover {
 
 	// 专用公理集
 	private Map<String, Proposition> axioms;
+	
 	// 所有语句的目标码模式
 	private Map<String, List<String>> allObjectCodePatterns;
+	
 	// 所有的循环不变式语句
 	private Map<String, List<Proposition>> loopInvariants;
-	
+		
 	private Recorder recorder;
 	
-	private final Logger logger = LoggerFactory.getLogger(Prover.class);
+	// 保存证明序列文件
+	private BufferedWriter sequences;
 	
 	// 中间过程输出结果
 	public BufferedWriter bufferedWriter;
-
-	public Prover(Recorder recorder) {
+	
+	private final Logger logger = LoggerFactory.getLogger(Prover.class);
+	
+	public Prover(Recorder recorder, String fileName) {
 		loadAxioms("src/main/resources/axiom/ppcAxiom.xls");
 		// showAxioms();
 
@@ -51,12 +56,14 @@ public class Prover {
 		// showAllLoopInvariants();
 		
 		this.recorder = recorder;
+		
+		this.sequences = createSequencesFile(fileName);
 	}
 	
-	public boolean runProver(String key) {		
+	public boolean runProver(String key, String label) {		
 		List<String> objectCodePatterns = getObjectCodePatterns(key);
 		createOutputFile(key);
-		return proveProcess(objectCodePatterns, key);
+		return proveProcess(objectCodePatterns, key, label);
 		
 	}
 	
@@ -66,19 +73,22 @@ public class Prover {
 	 * @param objectCodePatterns
 	 * @throws IOException
 	 */
-	public boolean proveProcess(List<String> objectCodePatterns, String name) {
+	public boolean proveProcess(List<String> objectCodePatterns, String name, String label) {
 		
 		// 验证结果
 		boolean isSame = false;
 		
-		recorder.insertLine("待证 : " + name);
+		recorder.insertLine(name + " : " + label);
+		recorder.insertLine(null);
 		recorder.insertLine("==============目标码模式===============");
 		showSingleObjectCodePatterns(objectCodePatterns);
 		
-		logger.info("待证 : " + name);
+		logger.info(label + " : " + name);
 		
 		if (bufferedWriter != null) {
 			try {
+				bufferedWriter.write(name + " : " + label + "\n");
+				bufferedWriter.newLine();
 				bufferedWriter.write("目标码模式 :\n");
 				saveAllString(objectCodePatterns);
 				bufferedWriter.flush();
@@ -91,13 +101,27 @@ public class Prover {
 		recorder.insertLine("==============目标码模式命题===============");
 		logger.info("调用命题映射算法");
 		List<Proposition> propositions = PropositionMappingAlgorithm.process(objectCodePatterns, axioms);
+		initPropositionProof(propositions);
 		showAllProposition(propositions);
 				
 		if (bufferedWriter != null) {
 			try {
 				bufferedWriter.write("目标码模式命题 :\n");
 				ProverHelper.saveAllProposition(propositions, bufferedWriter);
+				bufferedWriter.newLine();
 				bufferedWriter.flush();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		if (sequences != null) {
+			try {
+				sequences.write(name + " : " + label);
+				sequences.newLine();
+				sequences.write("目标码模式命题 :\n");
+				ProverHelper.saveAllProposition(propositions, sequences);
+				sequences.flush();
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -105,35 +129,42 @@ public class Prover {
 		
 		if (!ProverDefine.LOOPS.contains(name)) {
 			// 非循环命题推导
-			recorder.insertLine("==============命题推理结果===============");
+			recorder.insertLine("==============推导序列===============");
 			logger.info("调用自动推理算法");
-			List<Proposition> simplifiedPropositions = AutomaticDerivationAlgorithm.process(propositions);
-			showAllProposition(simplifiedPropositions);
+			DerivationDTO dto = AutomaticDerivationAlgorithm.process(propositions);
+			// 保存推导序列
+			for (int i = 0; i < dto.getProves().size(); i++) {
+				String line = dto.getProves().get(i) + ProverDefine.TAB + dto.getProofs().get(i);
+				recorder.insertLine(line);
+			}
+			recorder.insertLine(null);
+			
 			if (bufferedWriter != null) {
 				try {
-					bufferedWriter.write("命题推理结果 :\n");
-					ProverHelper.saveAllProposition(simplifiedPropositions, bufferedWriter);
-					bufferedWriter.flush();
+					bufferedWriter.write("推导序列 :\n");
+					for (int i = 0; i < dto.getProves().size(); i++) {
+						String line = dto.getProves().get(i) + ProverDefine.TAB + dto.getProofs().get(i);
+						bufferedWriter.write(line);
+						bufferedWriter.newLine();
+					}
+					bufferedWriter.newLine();
+					
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
 			}
 			
-			// 获得语义
-			recorder.insertLine("=============推理出的语义================");
-			List<Proposition> semantemes = SemantemeObtainAlgorithm.obtainSemantemeFromProposition(simplifiedPropositions);
-			showAllProposition(semantemes);	
-			recorder.insertLine("σ-transfer :");
-			List<Proposition> sigmaSemantemes = SemantemeObtainAlgorithm.standardSemantemes(semantemes);
-			showAllProposition(sigmaSemantemes);
-			
-			if (bufferedWriter != null) {
+			if (sequences != null) {
 				try {
-					bufferedWriter.write("推理出的语义为 :\n");
-					ProverHelper.saveAllProposition(semantemes, bufferedWriter);
-					bufferedWriter.write("σ-transfer : \n\n");
-					ProverHelper.saveAllProposition(sigmaSemantemes, bufferedWriter);
-					bufferedWriter.flush();
+					sequences.write("推导序列 :\n");
+					for (int i = 0; i < dto.getProves().size(); i++) {
+						String line = dto.getProves().get(i) + ProverDefine.TAB + dto.getProofs().get(i);
+						sequences.write(line);
+						sequences.newLine();
+					}
+					sequences.newLine();
+					sequences.flush();
+					
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -156,7 +187,7 @@ public class Prover {
 			// 判断语义是否一致
 			recorder.insertLine("===============结论================");
 			recorder.insertLine("给定的目标语义和推理出的语义是否一致 : ");
-			isSame = LoopInteractiveProvingAlgorithm.judgeSemantemes(goals, sigmaSemantemes);
+			isSame = LoopInteractiveProvingAlgorithm.judgeSemantemes(goals, dto.getSemantemeSet());
 			recorder.insertLine(Boolean.toString(isSame));
 			if (bufferedWriter != null) {
 				try {
@@ -174,7 +205,7 @@ public class Prover {
 			recorder.insertLine("=================循环交互证明算法===================");
 			try {
 				logger.info("调用循环交互证明算法");
-				isSame = LoopInteractiveProvingAlgorithm.process(propositions, name, loopInvariants, bufferedWriter, recorder);
+				isSame = LoopInteractiveProvingAlgorithm.process(propositions, name, loopInvariants, bufferedWriter, recorder, sequences);
 				recorder.insertLine("综上，给定的目标语义和推理出的语义是否一致 :");
 				recorder.insertLine(Boolean.toString(isSame));
 				
@@ -192,6 +223,16 @@ public class Prover {
 		}
 		
 		return isSame;
+	}
+	
+	// 产生初始命题的证据
+	public void initPropositionProof(List<Proposition> propositions) {
+		int i = 1;
+		for (Proposition proposition : propositions) {
+			String f = "P" + i;
+			proposition.setProof(f);
+			i++;
+		}
 	}
 
 	public List<String> getObjectCodePatterns(String key) {
@@ -384,15 +425,19 @@ public class Prover {
 	
 	public void showAllProposition(List<Proposition> propositions) {
 		for (Proposition proposition : propositions) {
-			recorder.insertLine(proposition.toString());
+			String line = proposition.toStr();
+			if (proposition.getProof() != null) {
+				line = proposition.getProof() + " = " + line;
+			}
+			recorder.insertLine(line);
 		}
+		recorder.insertLine(null);
 	}
 
 	public void createOutputFile(String key) {
 		try {
 			bufferedWriter = new BufferedWriter(new FileWriter(CommonsDefine.DEBUG_PATH + key + ".txt"));
-			bufferedWriter.write("======================结果输出=======================\n");
-			bufferedWriter.write("语句 : " + key + "\n");
+			bufferedWriter.write("======================结果输出=======================");
 			bufferedWriter.newLine();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -400,6 +445,29 @@ public class Prover {
 
 	}
 
+	public BufferedWriter createSequencesFile(String fileName) {
+		BufferedWriter bw = null;
+		
+		if (fileName == null) {
+			try {
+				bw =  new BufferedWriter(new FileWriter(CommonsDefine.OUTPUT_PATH + "prover.v"));
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+		} else {
+			int end = fileName.indexOf(".");
+			fileName = fileName.substring(0, end);
+			try {
+				bw = new BufferedWriter(new FileWriter(CommonsDefine.OUTPUT_PATH + fileName + ".v"));
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		return bw;
+	}
+	
 	public void saveAllString(List<String> objectCodePatterns) throws IOException {
 		for (String str : objectCodePatterns) {
 			bufferedWriter.write(str);
@@ -411,7 +479,7 @@ public class Prover {
 
 	public static void main(String[] args) {
 		Recorder recorder = new Recorder();
-		Prover prover = new Prover(recorder);
-		prover.runProver("if");
+		Prover prover = new Prover(recorder, null);
+		prover.runProver("do_while", "9.4");
 	}
 }

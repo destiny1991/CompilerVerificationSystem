@@ -268,15 +268,20 @@ public class ProverHelper {
 			items.add(item);
 		}
 		prop.setItems(items);
+		prop.setProof(proposition.getProof());
 
 		return prop;
 	}
 	
 	public static void saveAllProposition(List<Proposition> propositions, BufferedWriter bufferedWriter) throws IOException {
 		for (Proposition proposition : propositions) {
-			bufferedWriter.write(proposition.toString());
+			String line = proposition.toStr();
+			if (proposition.getProof() != null) {
+				line = proposition.getProof() + " = " + line;
+			}
+			bufferedWriter.write(line);
+			bufferedWriter.newLine();
 		}
-		bufferedWriter.newLine();
 	}
 	
 	public static void reducePropositionOfThree(Proposition proposition) {
