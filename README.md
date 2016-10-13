@@ -1,3 +1,3 @@
 # CompilerVerificationSystem
 
-当前开发分支!
+GUI设计完毕!
