@@ -198,12 +198,13 @@ public class Parser {
 				// 跳过左大括号
 				index++;
 				_block(funcStatementTree);
+				break;
 				
 			} else {
 				recorder.insertLine(Recorder.TAB + "函数定义 : 语法非法");
 				logger.info("函数定义 : 语法非法");
 				try {
-					throw new Exception("Error in functionStatement! : [" + getTokenLabel(index) + "]");
+					throw new Exception("Error in functionStatement! : " + getTokenType(index));
 				} catch (Exception e) {
 					e.printStackTrace();
 					System.exit(1);
@@ -212,13 +213,8 @@ public class Parser {
 			}
 		}
 		
-		if (index == tokens.size()) {
-			recorder.insertLine(Recorder.TAB + "函数定义 : 语法合法");
-			logger.info("函数定义 : 语法合法");
-		} else {
-			recorder.insertLine(Recorder.TAB + "函数定义 : 语法非法");
-			logger.info("函数定义 : 语法非法");
-		}
+		recorder.insertLine(Recorder.TAB + "函数定义 : 语法合法");
+		logger.info("函数定义 : 语法合法");
 		
 	}
 	
@@ -1323,15 +1319,14 @@ public class Parser {
 	public static void main(String[] args) {
 		// 公共记录
 		Recorder recorder = new Recorder();
-		String fileName = "evenSum.c";
 
-		Lexer lexer = new Lexer(fileName, recorder);
-		lexer.outputSrc();
-		lexer.labelSrc(fileName);
-		lexer.outputLabelSrc(fileName);
+		String srcPath = "src/main/resources/input/evenSum.c";
+		Lexer lexer = new Lexer(srcPath, recorder);
 		lexer.runLexer();
+		lexer.outputSrc();
+		lexer.outputLabelSrc();
 		lexer.outputLexer();
-		
+
 		Parser parser = new Parser(lexer.getTokens(), recorder);
 		parser.runParser();
 		parser.outputParser();
