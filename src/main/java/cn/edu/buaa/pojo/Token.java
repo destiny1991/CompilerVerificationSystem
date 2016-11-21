@@ -14,7 +14,6 @@ public class Token {
 	private String label;
 	
 	public Token() {
-		
 	}
 	
 	public Token(String type, String value, String label) {
@@ -61,4 +60,19 @@ public class Token {
 		this.label = label;
 	}
 	
+	@Override
+	public String toString() {
+		return "(" + getValue() + ", " + getType() + ", " + getLabel() + ")";
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		Token other = (Token) obj;
+		return value.equals(other.getValue());
+	}
+	
+	@Override
+	public int hashCode() {
+		return value.hashCode();
+	}
 }

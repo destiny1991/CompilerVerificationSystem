@@ -6,8 +6,8 @@ import java.util.HashMap;
 public class LexerDefine {
 
 	// token比较大的分类
-	public static final String[] TOKEN_STYLE = 
-		{ "KEY_WORD", "IDENTIFIER", "DIGIT_CONSTANT", "OPERATOR", "SEPARATOR", "STRING_CONSTANT" };
+	public static final String[] TOKEN_STYLE = { 
+			"KEY_WORD", "IDENTIFIER", "DIGIT_CONSTANT", "OPERATOR", "SEPARATOR", "STRING_CONSTANT" };
 
 	// 将关键字、运算符、分隔符进行具体化
 	public static final Map<String, String> DETAIL_TOKEN_STYLE = new HashMap<String, String>() {
@@ -24,6 +24,10 @@ public class LexerDefine {
 			put("while", "WHILE");
 			put("do", "DO");
 			put("return", "RETURN");
+			put("break", "BREAK");
+			put("continue", "CONTINUE");
+			put("goto", "GOTO");
+			put("union", "UNION");
 
 			put("=", "ASSIGN");
 			
@@ -55,6 +59,8 @@ public class LexerDefine {
 			put("--", "SELF_MINUS");
 			
 			put("\"", "DOUBLE_QUOTE");
+			put("'", "SINGLE_QUOTE");
+			
 			put("#", "SHARP");
 			put(",", "COMMA");
 			put(";", "SEMICOLON");
@@ -68,7 +74,9 @@ public class LexerDefine {
 	};
 
 	// 分隔符
-	public static final String[] delimiters = { "(", ")", "{", "}", "[", "]", ",", "\"", ";" };
+	public static final String[] delimiters = { 
+			"(", ")", "{", "}", "[", "]", ",", "\"", "\'", ";" 
+	};
 
 	// 运算符
 	public static final String[] operators = { 
@@ -84,7 +92,11 @@ public class LexerDefine {
 	public static final String[][] keywords = { 
 			{ "int", "float", "double", "char", "void" },
 			{ "if", "for", "while", "do", "else" }, 
-			{ "include", "return" } 
+			{ "include", "return", "break", "continue", "goto" } 
 	};
 	
+	// 三字母词
+	public static final String[] trigraphs = {
+			"??=", "??)", "??!", "??(", "??'", "??>", "??/", "??<", "??-"
+	};
 }

@@ -37,8 +37,10 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import javax.swing.LayoutStyle.ComponentPlacement;
 import javax.swing.UIManager;
@@ -99,7 +101,7 @@ public class MainWindow extends JFrame {
 	/**
 	 * System
 	 */
-	private String srcPath = "src/main/resources/input/evenSum.c";
+	private String srcPath;
 	private List<String> sources;
 	private List<String> sourceLabels;
 	private List<String> goals;
@@ -138,7 +140,8 @@ public class MainWindow extends JFrame {
 			try {
 				UIManager.setLookAndFeel(new NimbusLookAndFeel());
 			} catch (UnsupportedLookAndFeelException e2) {
-				throw new RuntimeException("JDK版本过低，请把JDK升级到1.7(含)以上！");
+				throw new RuntimeException(
+						"JDK版本过低，请把JDK升级到1.7(含)以上！");
 			}
 		}
 		
@@ -156,7 +159,11 @@ public class MainWindow extends JFrame {
 		
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setBounds(50, 30, 950, 660);	// 设置窗口大小
-		setTitle("Source File : " + getSrcFileName() + ".c");		// 由输入文件指定
+		String title = "Source File : ";
+		if (getSrcFileName() != null) {
+			title += getSrcFileName() + ".c";
+		}
+		setTitle(title);		// 由输入文件指定
 //		setAlwaysOnTop(true);
 		
 		menuPanel = new JPanel();
@@ -394,7 +401,7 @@ public class MainWindow extends JFrame {
 		btnOpen = new JButton("Open");
 		btnOpen.setUI(new CustomButtonUI());
 		btnOpen.setForeground(Color.RED);
-		chooser = new JFileChooser("./src/main/resources/input");
+		chooser = new JFileChooser(".");
 		btnOpen.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
@@ -416,7 +423,9 @@ public class MainWindow extends JFrame {
 		btnExit.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mouseClicked(MouseEvent e) {
-				Icon icon = new ImageIcon("src/main/resources/picture/buaa.jpg"); 
+
+				Icon icon = new ImageIcon(
+						this.getClass().getResource("/picture/buaa.jpg")); 
 				String content = "Compiler Verification System\n"
 								+ "Version : 1.0.1\n"
 								+ "Author : Chen Zhiwei\n"
@@ -542,7 +551,8 @@ public class MainWindow extends JFrame {
 			protected List<String> doInBackground() throws Exception {
 				// 公共记录
 				Recorder recorder = new Recorder();
-
+				if (srcPath == null) return null; 
+				
 				Lexer lexer = new Lexer(srcPath, recorder);
 				lexer.runLexer();
 				lexer.outputSrc();
@@ -569,7 +579,7 @@ public class MainWindow extends JFrame {
 				proves = prover.getProves();
 				proveLabels = prover.getProveLabels();
 				
-				return null;
+				return new ArrayList<>();
 			}
 			
 			@Override
@@ -579,6 +589,23 @@ public class MainWindow extends JFrame {
 			
 			@Override
 			protected void done() {
+				try {
+					if (get() == null) {
+						JOptionPane.showMessageDialog(MainWindow.this, "Please select a source file!", null, JOptionPane.WARNING_MESSAGE);	
+						lblStatus.setText("Status : (Completed)");
+						return;
+					}
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				} catch (ExecutionException e) {
+					e.printStackTrace();
+				}
+				
+				// 重置树的颜色
+				sourceRenderer.keys.clear();
+                goalRenderer.keys.clear();
+                proveRenderer.keys.clear();
+				
 				/**
 				 * 绘制sourceTree
 				 */
@@ -633,6 +660,11 @@ public class MainWindow extends JFrame {
 		}.execute();
 	}
 	
+	/**
+	 * 绘制证明树
+	 * @param topName
+	 * @return
+	 */
 	protected DefaultMutableTreeNode makeProveTree(String topName) {
 		DefaultMutableTreeNode top = new DefaultMutableTreeNode(new Node(topName));
 		for (int i = 0; i < proves.size(); i++) {
@@ -666,6 +698,11 @@ public class MainWindow extends JFrame {
 		return top;		
 	}
 	
+	/**
+	 * 绘制目标码树
+	 * @param topName
+	 * @return
+	 */
 	protected DefaultMutableTreeNode makeGoalTree(String topName) {
 		DefaultMutableTreeNode top = new DefaultMutableTreeNode(new Node(topName));
 		for (int i = 0; i < goals.size(); i++) {
@@ -699,6 +736,11 @@ public class MainWindow extends JFrame {
 		return top;
 	}
 
+	/**
+	 * 绘制源代码树
+	 * @param topName
+	 * @return
+	 */
 	protected DefaultMutableTreeNode makeSourceTree(String topName) {
 		DefaultMutableTreeNode top = new DefaultMutableTreeNode(new Node(topName));
 		
@@ -752,6 +794,7 @@ public class MainWindow extends JFrame {
 	}
 	
 	private String getSrcFileName() {
+		if (srcPath == null) return null;
 		String tmp = srcPath.substring(srcPath.lastIndexOf("/") + 1);
 		return tmp.substring(0, tmp.lastIndexOf("."));
 	}

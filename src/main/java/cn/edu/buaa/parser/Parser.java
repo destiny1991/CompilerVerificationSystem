@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Stack;
 
 import org.slf4j.Logger;
@@ -24,6 +25,13 @@ public class Parser {
 	private List<Token> tokens;
 	private int index;
 	private SyntaxTree tree;
+	private Map<String, String> variableTable;
+	private Map<String, String> globalVariableTable;
+	private boolean isGlobal;
+	
+	private Map<String, String> functions;
+	private Map<Token, List<Token>> recursions;	// <函数, 调用函数>
+	private Token recur;
 	
 	private Recorder recorder;
 	
@@ -33,6 +41,10 @@ public class Parser {
 		this.tokens = tokens;
 		this.index = 0;
 		this.tree = null;
+		this.variableTable = new HashMap<>();
+		this.globalVariableTable = new HashMap<>();
+		this.functions = new HashMap<>();
+		this.recursions = new HashMap<>();
 		this.recorder = recorder;
 	}
 	
@@ -94,7 +106,12 @@ public class Parser {
 		} else {
 			recorder.insertLine(Recorder.TAB + "include语句 : 语法非法");
 			logger.info("include语句 : 语法非法");
-			throw new RuntimeException("include语句未正确结束");
+			try {
+				throw new Exception("include语句未正确结束");
+			} catch (Exception e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
 		}
 		
 	}
@@ -110,6 +127,8 @@ public class Parser {
 		funcStatementTree.setRoot(root);
 		funcStatementTree.setCurrent(root);
 		tree.addChildNode(root, father);
+		variableTable.clear();
+		String funcName = "";
 		
 		while (index < tokens.size()) {
 			// 如果是函数返回类型
@@ -132,12 +151,14 @@ public class Parser {
 			} else if (getTokenType(index).equals("IDENTIFIER")) {
 				SyntaxTreeNode funcNameRoot = new SyntaxTreeNode("FunctionName");
 				funcStatementTree.addChildNode(funcNameRoot, root);
-
+				funcName = getTokenValue(index);
+				recur = tokens.get(index);
+				
 				HashMap<String, String> extraInfo = new HashMap<>();
 				extraInfo.put("type", "FUNCTION_NAME");
 				funcStatementTree.addChildNode(
 						new SyntaxTreeNode(
-								tokens.get(index).getValue(), 
+								getTokenValue(index), 
 								"IDENTIFIER", 
 								extraInfo,
 								getTokenLabel(index) + "_fs"), 
@@ -157,7 +178,7 @@ public class Parser {
 						
 						// extra_info
 						HashMap<String, String> extraInfo = new HashMap<>();
-						extraInfo.put("type", tokens.get(index).getValue());
+						extraInfo.put("type", getTokenValue(index));
 						funcStatementTree.addChildNode(
 								new SyntaxTreeNode(
 										getTokenValue(index), 
@@ -177,11 +198,13 @@ public class Parser {
 											extraInfo,
 											getTokenLabel(index + 1) + "_fs"), 
 									param);
+							variableTable.put(getTokenValue(index + 1), getTokenValue(index));
+							
 						} else {
-							recorder.insertLine(Recorder.TAB + "函数定义 : 语法非法");
-							logger.info("函数定义 : 语法非法");
+							recorder.insertLine(Recorder.TAB + funcName + "函数定义 : 语法非法");
+							logger.info(funcName + "函数定义 : 语法非法");
 							try {
-								throw new Exception("函数定义参数错误");
+								throw new Exception(funcName + "函数参数定义错误, 未给出参数的标识符");
 							} catch (Exception e) {
 								e.printStackTrace();
 								System.exit(1);
@@ -195,14 +218,36 @@ public class Parser {
 				
 			// 如果是遇见了左大括号
 			} else if (getTokenType(index).equals("LB_BRACKET")) {
+				// 规则 8.1（强制）： 函数应当具有原型声明，且原型在函数的定义和调用范围内都是可见的。
+				if (!funcName.equals("main") && !functions.containsKey(funcName)) {
+					try {
+						throw new Exception(
+								"Error [" + getTokenLabel(index) + "]: The function should have a prototype declaration '" + funcName + "'");
+					} catch (Exception e) {
+						e.printStackTrace();
+						System.exit(1);
+					}
+					
+				}
+				
+				recursions.put(recur, new ArrayList<>());
+				
 				// 跳过左大括号
 				index++;
 				_block(funcStatementTree);
 				break;
+			
+			// 如果是分号，即函数声明
+			} else if (getTokenType(index).equals("SEMICOLON")) {
+				SyntaxTreeNode end = new SyntaxTreeNode("SEMICOLON");
+				funcStatementTree.addChildNode(end, root);
+				functions.put(funcName, funcName);
+				index++;
+				break;
 				
 			} else {
-				recorder.insertLine(Recorder.TAB + "函数定义 : 语法非法");
-				logger.info("函数定义 : 语法非法");
+				recorder.insertLine(Recorder.TAB + funcName + "函数定义 : 语法非法");
+				logger.info(funcName + "函数定义 : 语法非法");
 				try {
 					throw new Exception("Error in functionStatement! : " + getTokenType(index));
 				} catch (Exception e) {
@@ -213,9 +258,8 @@ public class Parser {
 			}
 		}
 		
-		recorder.insertLine(Recorder.TAB + "函数定义 : 语法合法");
-		logger.info("函数定义 : 语法合法");
-		
+		recorder.insertLine(Recorder.TAB + funcName + "函数定义 : 语法合法");
+		logger.info(funcName + "函数定义 : 语法合法");
 	}
 	
 	// 处理大括号里的部分
@@ -318,7 +362,44 @@ public class Parser {
 								extraInfo,
 								getTokenLabel(index) + "_st"), 
 						root);
-			
+				if (isGlobal) {
+					if (globalVariableTable.containsKey(getTokenValue(index))) {
+						try {
+							throw new Exception(
+									"Error ["+ getTokenLabel(index) + "] : Repeat variable definition " 
+											+ getTokenValue(index));
+						} catch (Exception e) {
+							e.printStackTrace();
+							System.exit(1);
+						}
+						
+					} else if (variableTable.containsKey(getTokenValue(index))) {
+						System.err.print("Warning ["+ getTokenLabel(index) 
+							+ "] : the identifier of the internal scope should not be the same as the identifier with an external scope! '" 
+								+ getTokenValue(index) + "'\n");
+					}
+					
+					globalVariableTable.put(getTokenValue(index), tmpVariableType);
+				} else {
+					if (variableTable.containsKey(getTokenValue(index))) {
+						try {
+							throw new Exception(
+									"Error ["+ getTokenLabel(index) + "] : Repeat variable definition " 
+											+ getTokenValue(index));
+						} catch (Exception e) {
+							e.printStackTrace();
+							System.exit(1);
+						}
+						
+					} else if (globalVariableTable.containsKey(getTokenValue(index))) {
+						System.err.print("Warning ["+ getTokenLabel(index) 
+						+ "] : the identifier of the internal scope should not be the same as the identifier with an external scope! '" 
+							+ getTokenValue(index) + "'\n");
+					}
+					
+					variableTable.put(getTokenValue(index), tmpVariableType);
+				}
+				
 			// 数组大小	
 			} else if (getTokenType(index).equals("DIGIT_CONSTANT")) {
 				HashMap<String, String> extraInfo = new HashMap<>();
@@ -397,6 +478,44 @@ public class Parser {
 										getTokenLabel(index) + "_st"), 
 								tmpTree.getRoot());
 						
+						if (isGlobal) {
+							if (globalVariableTable.containsKey(getTokenValue(index))) {
+								try {
+									throw new Exception(
+											"Error ["+ getTokenLabel(index) + "] : Repeat variable definition " 
+													+ getTokenValue(index));
+								} catch (Exception e) {
+									e.printStackTrace();
+									System.exit(1);
+								}
+								
+							} else if (variableTable.containsKey(getTokenValue(index))) {
+								System.err.print("Warning ["+ getTokenLabel(index) 
+								+ "] : the identifier of the internal scope should not be the same as the identifier with an external scope! '" 
+									+ getTokenValue(index) + "'\n");
+							}
+							
+							globalVariableTable.put(getTokenValue(index), tmpVariableType);
+						} else {
+							if (variableTable.containsKey(getTokenValue(index))) {
+								try {
+									throw new Exception(
+											"Error ["+ getTokenLabel(index) + "] : Repeat variable definition " 
+													+ getTokenValue(index));
+								} catch (Exception e) {
+									e.printStackTrace();
+									System.exit(1);
+								}
+								
+							} else if (globalVariableTable.containsKey(getTokenValue(index))) {
+								System.err.print("Warning ["+ getTokenLabel(index) 
+								+ "] : the identifier of the internal scope should not be the same as the identifier with an external scope! '" 
+									+ getTokenValue(index) + "'\n");
+							}
+							
+							variableTable.put(getTokenValue(index), tmpVariableType);
+						}
+						
 					} else if (getTokenType(index).equals("COMMA")) { 
 						// 继续执行
 						
@@ -449,9 +568,20 @@ public class Parser {
 		assignTree.setCurrent(root);
 		tree.addChildNode(root, father);
 				
-		while(!getTokenType(index).equals("SEMICOLON")) {			
+		while(!getTokenType(index).equals("SEMICOLON")) {	
 			// 被赋值的变量
 			if(getTokenType(index).equals("IDENTIFIER")) {
+				if (!variableTable.containsKey(getTokenValue(index)) 
+						&& !globalVariableTable.containsKey(getTokenValue(index))) {
+					try {
+						throw new Exception(
+								"Undefined variable [" + getTokenLabel(index) + "] : " + getTokenValue(index));
+					} catch (Exception e) {
+						e.printStackTrace();
+						System.exit(1);
+					}
+				}
+				
 				assignTree.addChildNode(
 						new SyntaxTreeNode(
 								getTokenValue(index), 
@@ -518,7 +648,8 @@ public class Parser {
 				recorder.insertLine(Recorder.TAB + "while语句 : 语法非法");
 				logger.info("while语句 : 语法非法");
 				try {
-					throw new Exception("while statement body must be surrouded by '{}' : " + getTokenValue(index));
+					throw new Exception(
+							"Error [" + getTokenLabel(index) + "] : while statement shall be a compound statement!({..})");
 				} catch (Exception e) {
 					e.printStackTrace();
 					System.exit(1);
@@ -665,7 +796,8 @@ public class Parser {
 				recorder.insertLine(Recorder.TAB + "if-else语句 : 语法非法");
 				logger.info("if-else语句 : 语法非法");
 				try {
-					throw new Exception("if statement must be surrounded by '{}'");
+					throw new Exception(
+							"Error [" + getTokenLabel(index) + "] : if statement shall be a compound statement!({..})");
 				} catch (Exception e) {
 					e.printStackTrace();
 					System.exit(1);
@@ -708,7 +840,8 @@ public class Parser {
 				 recorder.insertLine(Recorder.TAB + "if-else语句 : 语法非法");
 				 logger.info("if-else语句 : 语法非法");
 				 try {
-					throw new Exception("else statement must be surrounded by '{}'");
+					 throw new Exception(
+								"Error [" + getTokenLabel(index) + "] : else statement shall be a compound statement!({..})");
 				} catch (Exception e) {
 					e.printStackTrace();
 					System.exit(1);
@@ -780,7 +913,8 @@ public class Parser {
 				recorder.insertLine(Recorder.TAB + "for语句 : 语法非法");
 				logger.info("for语句 : 语法非法");
 				try {
-					throw new Exception("for statement must be surrounded by '{}'");
+					throw new Exception(
+							"Error [" + getTokenLabel(index) + "] : for statement shall be a compound statement!({..})");
 				} catch (Exception e) {
 					e.printStackTrace();
 					System.exit(1);
@@ -855,7 +989,8 @@ public class Parser {
 					getTokenLabel(index) + "_re"
 					);
 			returnTree.addChildNode(returnNode, root);
-			index++;	
+			index++;
+			
 		} else {
 			recorder.insertLine(Recorder.TAB + "return语句 : 语法非法");
 			logger.info("return语句 : 语法非法");
@@ -883,7 +1018,8 @@ public class Parser {
 		}
 		
 		// 如果是函数调用
-		if (getTokenType(index).equals("IDENTIFIER") && getTokenType(index + 1).equals("LL_BRACKET")) {
+		if (getTokenType(index).equals("IDENTIFIER") 
+				&& getTokenType(index + 1).equals("LL_BRACKET")) {
 			_functionCall(father);
 			index--;
 			return;
@@ -922,6 +1058,18 @@ public class Parser {
 				if (ParserUtils.isOperator(getTokenValue(index + 1))
 						|| getTokenType(index + 1).equals("SEMICOLON")
 						|| getTokenType(index + 1).equals("RL_BRACKET")) {
+					
+					if (!variableTable.containsKey(getTokenValue(index))
+							&& !globalVariableTable.containsKey(getTokenValue(index))) {
+						try {
+							throw new Exception(
+									"Undefined variable [" + getTokenLabel(index) + "] : " + getTokenValue(index));
+						} catch (Exception e) {
+							e.printStackTrace();
+						}
+						
+					}
+					
 					SyntaxTree tmpTree = new SyntaxTree();
 					SyntaxTreeNode variableRoot = new SyntaxTreeNode("Expression", "Variable", null, null);
 					tmpTree.setRoot(variableRoot);
@@ -974,13 +1122,13 @@ public class Parser {
 							System.exit(1);
 						}
 					}
-				}
-				
-				else {
+					
+				} else {
 					recorder.insertLine(Recorder.TAB + "表达式语句 : 语法非法");
 					logger.info("表达式语句 : 语法非法");
 					try {
-						throw new Exception("not support identifer : " + getTokenType(index + 1));
+						throw new Exception(
+								"not support identifer ["+ getTokenLabel(index) + "] : " + getTokenValue(index + 1));
 					} catch (Exception e) {
 						e.printStackTrace();
 						System.exit(1);
@@ -1031,6 +1179,15 @@ public class Parser {
 					operatorStack.add(tmpTree);
 				}
 				
+			} else if(getTokenType(index).equals("COMMA")) {
+				try {
+					throw new Exception(
+							"Error : [" + getTokenLabel(index) + "]The security C subset does not allowed ',' operator!");
+				} catch (Exception e) {
+					e.printStackTrace();
+					System.exit(1);
+				}
+			
 			} else {
 				recorder.insertLine(Recorder.TAB + "表达式语句 : 语法非法");
 				logger.info("表达式语句 : 语法非法");
@@ -1080,6 +1237,49 @@ public class Parser {
 		while(!getTokenType(index).equals("SEMICOLON")) {
 			// 函数名
 			if(getTokenType(index).equals("IDENTIFIER")) {
+				if (getTokenValue(index).equals("longjmp")) {
+					try {
+						throw new Exception(
+								"Error [" + getTokenLabel(index) + 
+								"] : The longjmp function shall not be used in the secure C! '" + getTokenValue(index) + "'");
+					} catch (Exception e1) {
+						e1.printStackTrace();
+						System.exit(1);
+					}
+					
+				}
+				
+				if (getTokenValue(index).equals("atof")
+						|| getTokenValue(index).equals("atoi")
+						|| getTokenValue(index).equals("atol")) {
+					try {
+						throw new Exception(
+								"Error [" + getTokenLabel(index) 
+								+ "] : The library functions atof, atoi and atol from library <stdlib.h> shall not be used! '" 
+								+ getTokenValue(index) + "'");
+					} catch (Exception e1) {
+						e1.printStackTrace();
+						System.exit(1);
+					}
+					
+				}
+				
+				if ( getTokenValue(index).equals("abort")
+						|| getTokenValue(index).equals("exit")
+						|| getTokenValue(index).equals("getenv")
+						|| getTokenValue(index).equals("system")) {
+					try {
+						throw new Exception(
+								"Error [" + getTokenLabel(index) 
+								+ "] : The library functions abort, exit, getenv and system from library <stdlib.h> shall not be used! '" 
+								+ getTokenValue(index) + "'");
+					} catch (Exception e1) {
+						e1.printStackTrace();
+						System.exit(1);
+					}
+					
+				}
+				
 				funcCallTree.addChildNode(
 							new SyntaxTreeNode(
 									getTokenValue(index), 
@@ -1087,7 +1287,11 @@ public class Parser {
 									null,
 									getTokenLabel(index) + "_fc"), 
 							null);
-			
+				
+				// 封装函数调用名
+				List<Token> tmpValues = recursions.get(recur);
+				tmpValues.add(tokens.get(index));
+				
 			// 左小括号
 			} else if(tokens.get(index).getType().equals("LL_BRACKET")) {
 				index++;
@@ -1098,6 +1302,20 @@ public class Parser {
 					if (getTokenType(index).equals("IDENTIFIER")
 							|| getTokenType(index).equals("DIGIT_CONSTANT")
 							|| getTokenType(index).equals("STRING_CONSTANT")) {
+						
+						if (getTokenType(index).equals("IDENTIFIER") 
+								&& !variableTable.containsKey(getTokenValue(index))
+								&& !globalVariableTable.containsKey(getTokenValue(index))) {
+							try {
+								throw new Exception(
+										"Undefined variable [" + getTokenLabel(index) + "] : " + getTokenValue(index));
+							} catch (Exception e) {
+								e.printStackTrace();
+								System.exit(1);
+							}
+						
+						}
+						
 						funcCallTree.addChildNode(
 								new SyntaxTreeNode(
 										getTokenValue(index), 
@@ -1131,7 +1349,14 @@ public class Parser {
 					} else {
 						recorder.insertLine(Recorder.TAB + "函数调用语句 : 语法非法");
 						logger.info("函数调用语句 : 语法非法");
-						throw new RuntimeException("functionCall statement not support : " + getTokenType(index));
+						try {
+							throw new Exception(
+									"functionCall statement not support : " + getTokenType(index));
+						} catch (Exception e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+							System.exit(1);
+						}
 						
 					}
 					index++;
@@ -1160,7 +1385,7 @@ public class Parser {
 		
 		String tokenValue = getTokenValue(index);
 		String tokenType = getTokenType(index);
-		
+				
 		// include句型
 		if (tokenType.equals("SHARP") && getTokenType(index + 1).equals("INCLUDE")) {
 			return "INCLUDE";
@@ -1170,9 +1395,10 @@ public class Parser {
 			return "CONTROL";
 			
 		// 可能是声明语句或函数声明语句
-		} else if (ParserUtils.isInnerDataType(tokenValue) && getTokenType(index + 1).equals("IDENTIFIER")) {
+		} else if (ParserUtils.isInnerDataType(tokenValue) 
+				&& getTokenType(index + 1).equals("IDENTIFIER")) {
 			String index2TokenType = getTokenType(index + 2);
-			
+						
 			if(index2TokenType.equals("LL_BRACKET")) {
 				return "FUNCTION_STATEMENT";
 			} else if (index2TokenType.equals("SEMICOLON") || index2TokenType.equals("LM_BRACKET")
@@ -1232,7 +1458,7 @@ public class Parser {
 		// 遍历所有的token
 		while (index < tokens.size()) {
 			String sentencePattern = judgeSentencePattern();
-			
+						
 			// include语句
 			if(sentencePattern.equals("INCLUDE")) {
 				_include(root);
@@ -1243,7 +1469,9 @@ public class Parser {
 				
 			// 声明语句
 			} else if(sentencePattern.equals("STATEMENT")) {
+				isGlobal = true;
 				_statement(root);
+				isGlobal = false;
 				
 			// 函数调用
 			} else if(sentencePattern.equals("FUNCTION_CALL")) {
@@ -1259,10 +1487,46 @@ public class Parser {
 			}
 		}
 		
+		// 安全C检查
+		for (Token entry : recursions.keySet()) {
+			Stack<Token> visits = new Stack<>();
+			visits.add(entry);
+			if (!dfs(entry, visits)) {
+				try {
+					throw new Exception(
+							"Error [" + entry.getLabel() + "] : Functions shall not call themselves, either directly or indirectly! '"+ entry.getValue() +"(..)'");
+				} catch (Exception e) {
+					e.printStackTrace();
+					System.exit(1);
+				}
+			}
+		}
+		
 		recorder.insertLine("语法分析结束!");
 		logger.info("语法分析结束!");
 	}
 	
+	private boolean dfs(Token key, Stack<Token> visits) {
+		if (!recursions.containsKey(key)) {
+			return true;
+		}
+		
+		boolean flag = true;
+		for (Token entry : recursions.get(key)) {			
+			if (visits.contains(entry)) {
+				return false;
+			}
+			visits.push(entry);
+			if (!dfs(entry, visits)) {
+				flag = false;
+				break;
+			}
+			visits.pop();
+		}
+		
+		return flag;
+	}
+
 	// 递归输出语法树
 	private void display(SyntaxTreeNode node, BufferedWriter writer) {
 		if(null == node) return;
@@ -1320,7 +1584,7 @@ public class Parser {
 		// 公共记录
 		Recorder recorder = new Recorder();
 
-		String srcPath = "src/main/resources/input/evenSum.c";
+		String srcPath = "conf/input/test9.c";
 		Lexer lexer = new Lexer(srcPath, recorder);
 		lexer.runLexer();
 		lexer.outputSrc();
@@ -1329,8 +1593,6 @@ public class Parser {
 
 		Parser parser = new Parser(lexer.getTokens(), recorder);
 		parser.runParser();
-		parser.outputParser();
-		
+		parser.outputParser();	
 	}
-	
 }

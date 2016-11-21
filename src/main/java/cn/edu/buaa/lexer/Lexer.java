@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import cn.edu.buaa.constant.CommonsDefine;
+import cn.edu.buaa.constant.LexerDefine;
 import cn.edu.buaa.pojo.Token;
 import cn.edu.buaa.recorder.Recorder;
 
@@ -40,11 +41,13 @@ public class Lexer {
 		this.recorder = recorder;
 		this.srcDir = srcPath.substring(0, srcPath.lastIndexOf("/") + 1);
 		this.srcName = srcPath.substring(srcPath.lastIndexOf("/") + 1);
-		srcs = getContent(srcName);
+		
 		sources = new ArrayList<>();
 		labels = new ArrayList<>();
 		tokens = new ArrayList<Token>();
 		fileNames = new HashSet<>();
+		
+		srcs = getContent(srcName);
 	}
 
 	public List<String> getSrcs() {
@@ -69,10 +72,11 @@ public class Lexer {
 		logger.info("词法分析开始...");
 		recorder.insertLine("词法分析开始...");
 		
+		List<String> libs = new ArrayList<>();
 		BufferedWriter writer = null;
 		try {
 			writer = new BufferedWriter(
-					new FileWriter(CommonsDefine.OUTPUT_PATH + "/label_" + srcName));
+					new FileWriter(CommonsDefine.OUTPUT_PATH + "label_" + srcName));
 			fileNames.add(srcName.substring(0, srcName.indexOf(".")));
 			
 			Stack<Integer> stack = new Stack<>();
@@ -90,7 +94,8 @@ public class Lexer {
 
 				if (line.trim().length() != 0) {
 					//String label = generateLabel(stack);
-					solveLine(line.trim(), stack);
+					List<String> tmpLibs = solveLine(line.trim(), stack);
+					libs.addAll(tmpLibs);
 					
 					line = LexerUtils.RTrim(line);
 					for (int j = line.length(); j < LexerUtils.LEN; j++) {
@@ -121,6 +126,11 @@ public class Lexer {
 				}
 			}
 			
+			// 最后处理所有的library
+			for (String lib : libs) {
+				solveMultipleFile(lib, stack);
+			}
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		} finally {
@@ -133,8 +143,89 @@ public class Lexer {
 			}
 		}
 		
+		secureCheck();
+		
 		recorder.insertLine("词法分析结束!");
 		logger.info("词法分析结束!");
+	}
+	
+	// 安全C子集集中检测，注意还有一些安全C子集规则在词法分析中检测完成
+	private void secureCheck() {
+		for (Token e : tokens) {
+			
+			if (!checkTrigraphs(e)) {
+				try {
+					throw new Exception(
+							"Error [" + e.getLabel() +"] : not allowned using trigraphs " + e.getValue());
+				} catch (Exception e1) {
+					e1.printStackTrace();
+					System.exit(1);
+				}
+			}
+			
+			// 规则 5.1（强制）： 标识符（内部的和外部的）的有效字符不能多于 31。
+			if (e.getType().equals("IDENTIFIER") && e.getValue().length() > 31) {
+				try {
+					throw new Exception(
+							"Error [" + e.getLabel() +"] : the length of identifier should not more than 31 " + e.getValue());
+				} catch (Exception e1) {
+					e1.printStackTrace();
+					System.exit(1);
+				}
+			}
+			
+			if (e.getType().equals("CONTINUE")) {
+				try {
+					throw new Exception(
+							"Error [" + e.getLabel() +"] : The continue statement shall not be used! '" + e.getValue() + "'");
+				} catch (Exception e1) {
+					e1.printStackTrace();
+					System.exit(1);
+				}
+				
+			}
+			
+			if (e.getType().equals("GOTO")) {
+				try {
+					throw new Exception(
+							"Error [" + e.getLabel() +"] : The goto statement shall not be used! '" + e.getValue() + "'");
+				} catch (Exception e1) {
+					e1.printStackTrace();
+					System.exit(1);
+				}
+			}
+			
+			if (e.getType().equals("UNION")) {
+				try {
+					throw new Exception(
+							"Error [" + e.getLabel() +"] : Unions shall not be used! '" + e.getValue() + "'");
+				} catch (Exception e1) {
+					e1.printStackTrace();
+					System.exit(1);
+				}
+			}
+			
+			if (e.getValue().equals("alloc") || e.getValue().equals("malloc")
+					|| e.getValue().equals("realloc") || e.getValue().equals("free")) {
+				try {
+					throw new Exception(
+							"Error [" + e.getLabel() +"] : Dynamic heap memory allocation shall not be used! '" + e.getValue() + "'");
+				} catch (Exception e1) {
+					e1.printStackTrace();
+					System.exit(1);
+				}
+			}
+			
+		}
+	}
+
+	private boolean checkTrigraphs(Token e) {
+		for (String string : LexerDefine.trigraphs) {
+			if (e.getValue().contains(string)) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private String generateLabel(Stack<Integer> stack) {
@@ -151,8 +242,9 @@ public class Lexer {
 		return v;
 	}
 
-	private void solveLine(String line, Stack<Integer> stack) {
-
+	private List<String> solveLine(String line, Stack<Integer> stack) {
+		
+		List<String> libs = new ArrayList<>();
 		int i = 0;
 		Token token = null;
 		while (i < line.length()) {
@@ -180,6 +272,18 @@ public class Lexer {
 						// 找到include的头文件
 						String lib = "";
 						while (line.charAt(i) != close_flag) {
+							if (line.charAt(i) == '\'' || line.charAt(i) == ','
+									|| line.charAt(i) == '/' || line.charAt(i) == '*') {
+								try {
+									throw new Exception(
+											"Error [" + generateLabel(stack) + 
+											"] : Non-standard characters should not occur in header file names in #include directive! '" + line.charAt(i) + "'");
+								} catch (Exception e1) {
+									e1.printStackTrace();
+									System.exit(1);
+								}
+							}
+							
 							lib += line.charAt(i);
 							i++;
 						}
@@ -193,7 +297,7 @@ public class Lexer {
 						i = LexerUtils.skipBlank(i + 1, line);
 						
 						// 增加处理多个文件的逻辑
-						solveMultipleFile(lib, stack);
+						libs.add(lib);
 						
 					} else {
 						try {
@@ -205,6 +309,7 @@ public class Lexer {
 							throw new Exception("include error [" + label + "] : " + line.substring(i, i + tmp));
 						} catch (Exception e) {
 							e.printStackTrace();
+							System.exit(1);
 						}
 					}
 
@@ -220,7 +325,6 @@ public class Lexer {
 
 			// 如果是字母或者是以下划线开头
 			} else if (Character.isLetter(line.charAt(i)) || line.charAt(i) == '_') {
-
 				String word = "";
 				while (i < line.length() && (Character.isLetterOrDigit(line.charAt(i)) || line.charAt(i) == '_')) {
 					word += line.charAt(i);
@@ -236,6 +340,7 @@ public class Lexer {
 				} else {
 					token = new Token(1, word, generateLabel(stack));
 					tokens.add(token);
+					
 				}
 				i = LexerUtils.skipBlank(i, line);
 
@@ -245,7 +350,6 @@ public class Lexer {
 				boolean pointExist = false;
 				boolean suffix = false;
 				while (i < line.length()) {
-
 					if (Character.isDigit(line.charAt(i))) {
 						word += line.charAt(i);
 						
@@ -274,14 +378,15 @@ public class Lexer {
 
 				// 如果是分隔符
 			} else if (LexerUtils.isDelimiter(line.charAt(i))) {
-				token = new Token(4, line.charAt(i), generateLabel(stack));
-				tokens.add(token);
-
-				// 如果是字符串常量
-				if (line.charAt(i) == '\"') {
+				// 如果是字符常量
+				if (line.charAt(i) == '\'') {
 					i++;
 					String word = "";
-					while (i < line.length() && line.charAt(i) != '\"') {
+					while (i < line.length() && line.charAt(i) != '\'') {
+						if (line.charAt(i) == '\\') {
+							word += line.charAt(i);
+							i++;
+						}
 						word += line.charAt(i);
 						i++;
 					}
@@ -289,20 +394,60 @@ public class Lexer {
 					if (i >= line.length()) {
 						try {
 							String label = generateLabel(stack);
-							throw new Exception("Can't find the end character of the string constant [" + label + "]");
+							throw new Exception(
+									"Can't find the end character of the char [" + label + "] : " + word);
 						} catch (Exception e) {
 							e.printStackTrace();
 							System.exit(1);
 						}
 						
 					} else {
+						token = new Token(2,
+								"'" + word + "'",
+								generateLabel(stack));
+						tokens.add(token);
+					}
+				
+				// 字符串常量 
+				} else if (line.charAt(i) == '\"') {
+					token = new Token(4, line.charAt(i), generateLabel(stack));
+					tokens.add(token);
+					i++;
+					String word = "";
+					while (i < line.length() && line.charAt(i) != '\"') {
+						if (line.charAt(i) == '\\') {
+							word += line.charAt(i);
+							i++;
+						}
+						word += line.charAt(i);
+						i++;
+					}
+
+					if (i >= line.length()) {
+						try {
+							String label = generateLabel(stack);
+							throw new Exception(
+									"Can't find the end character of the string constant [" + label + "]");
+						} catch (Exception e) {
+							e.printStackTrace();
+							System.exit(1);
+						}
+
+					} else {
 						token = new Token(5, word, generateLabel(stack));
 						tokens.add(token);
 						token = new Token(4, '\"', generateLabel(stack));
 						tokens.add(token);
-						
+
 					}
+				
+				// 其它分隔符
+				} else {
+					token = new Token(4, line.charAt(i), generateLabel(stack));
+					tokens.add(token);
+					
 				}
+				
 				i = LexerUtils.skipBlank(i + 1, line);
 
 			// 如果是运算符
@@ -341,14 +486,22 @@ public class Lexer {
 				}
 			}
 		}
-
+		
+		return libs;
 	}
 
 	// 处理多文件连编
 	private void solveMultipleFile(String libName, Stack<Integer> stack) {
-		
 		if (libName.contains(".")) {
 			libName = libName.substring(0, libName.indexOf("."));
+			// 是否是C语言自带的头文件
+			for (String header : CommonsDefine.LIBS) {
+				if (header.equals(libName + ".h")) {
+					return;
+				}
+			}
+			
+			// 为自定义的头文件
 			if (!fileNames.contains(libName)) {
 				fileNames.add(libName);
 				
@@ -356,22 +509,50 @@ public class Lexer {
 				return;		// 表示此文件已经处理过了
 			}
 			
-			libName += ".c";
 		}
 		
-		// 找不到的源文件即为系统文件
-		File file = new File(srcDir + libName);
+		// 找不到头文件
+		String headName = libName + ".h";
+		File file = new File(srcDir + libName + ".h");
 		if (!file.exists()) {
-			return;
+			try {
+				throw new Exception("Can't find header file : " + libName + ".h");
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 		
-		List<String> libs = getContent(libName);
+		// 找不到源文件
+		libName += ".c";
+		file = new File(srcDir + libName);
+		if (!file.exists()) {
+			try {
+				throw new Exception("Can't find source file : " + libName);
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		
+		List<String> tmpSources = new ArrayList<>();
+		List<String> tmpLabels = new ArrayList<>();
+		
+		handleFile(headName, tmpSources, tmpLabels, stack);
+		handleFile(libName, tmpSources, tmpLabels, stack);
+		
+		sources.addAll(tmpSources);
+		labels.addAll(tmpLabels);
+	}
+
+
+	private void handleFile(String libName, List<String> tmpSources, List<String> tmpLabels, Stack<Integer> stack) {
+		List<String> contents = getContent(libName);
 		BufferedWriter writer = null;
+		List<String> libs = new ArrayList<>();
 		try {
 			writer = new BufferedWriter(
 					new FileWriter(CommonsDefine.OUTPUT_PATH + "/label_" + libName));
 			
-			for (String line : libs) {
+			for (String line : contents) {
 				String label = "";
 				String tmpLine = line;
 				
@@ -382,7 +563,8 @@ public class Lexer {
 				}
 
 				if (line.trim().length() != 0) {
-					solveLine(line.trim(), stack);
+					List<String> tmpLibs = solveLine(line.trim(), stack);
+					libs.addAll(tmpLibs);
 					
 					line = LexerUtils.RTrim(line);
 					for (int j = line.length(); j < LexerUtils.LEN; j++) {
@@ -400,8 +582,8 @@ public class Lexer {
 				writer.newLine();
 				writer.flush();
 				
-				sources.add(tmpLine);
-				labels.add(label);
+				tmpSources.add(tmpLine);
+				tmpLabels.add(label);
 				
 				if (line.contains("{")) {
 					stack.push(0);
@@ -411,6 +593,10 @@ public class Lexer {
 					int tmp = stack.pop();
 					stack.push(tmp + 1);
 				}
+			}
+			
+			for (String lib : libs) {
+				solveMultipleFile(lib, stack);
 			}
 			
 		} catch (IOException e) {
@@ -435,8 +621,7 @@ public class Lexer {
 		List<String> codes = new ArrayList<>();
 
 		try {
-			reader = new BufferedReader(
-					new FileReader(srcDir + srcName));
+			reader =  new BufferedReader(new FileReader(srcDir + srcName));
 			String line = null;
 			while ((line = reader.readLine()) != null) {
 				codes.add(line);
@@ -467,8 +652,8 @@ public class Lexer {
 	private List<String> delComments(List<String> codes) {
 
 		int i = 0;
+		int tmp = 1;
 		while (i < codes.size()) {
-
 			String line = codes.get(i);
 			boolean isInDoubleQuote = false;
 			for (int j = 0; j < line.length(); j++) {
@@ -478,6 +663,9 @@ public class Lexer {
 					
 					// 删去 // xxx 式注释
 				} else if (ch == '/' && j + 1 < line.length() && line.charAt(j + 1) == '/' && !isInDoubleQuote) {
+					// 规则 2.2（强制）： 源代码应该使用 /*…*/ 类型的注释
+					System.err.print("Warning [" + tmp + "] : The security C subset does not allowed comments of type '//'!\n");
+					
 					line = line.substring(0, j);
 					codes.remove(i);
 					if (line.trim().length() != 0) {
@@ -485,6 +673,7 @@ public class Lexer {
 					} else {
 						i--;
 					}
+					
 					break;
 
 					// 删除 /* xxx */ 式注释
@@ -493,6 +682,16 @@ public class Lexer {
 					boolean isEnd = false;
 
 					while (k < line.length()) {
+						// 则 2.3（强制）： 字符序列 /* 不应出现在注释中。
+						if (line.charAt(k) == '/' && k + 1 < line.length() && line.charAt(k + 1) == '*') {							
+							try {
+								throw new Exception("Error [" + i + "] : / * Should not appear in comments");
+							} catch (Exception e) {
+								e.printStackTrace();
+								System.exit(1);
+							}
+						}
+						
 						if (line.charAt(k) == '*' && k + 1 < line.length() && line.charAt(k + 1) == '/') {
 							isEnd = true;
 							break;
@@ -512,6 +711,15 @@ public class Lexer {
 						for (; endLine < codes.size(); endLine++) {
 							String str = codes.get(endLine);
 							for (k = 0; k < str.length(); k++) {
+								if (str.charAt(k) == '/' && k + 1 < str.length() && str.charAt(k + 1) == '*') {							
+									try {
+										throw new Exception("Error [" + endLine + "] : / * Should not appear in comments");
+									} catch (Exception e) {
+										e.printStackTrace();
+										System.exit(1);
+									}
+								}
+								
 								if (str.charAt(k) == '*' && k + 1 < str.length() && str.charAt(k + 1) == '/') {
 									break;
 								}
@@ -553,6 +761,7 @@ public class Lexer {
 				}
 			}
 			i++;
+			tmp++;
 		}
 
 		return codes;
@@ -565,7 +774,7 @@ public class Lexer {
 		BufferedWriter writer = null;
 		try {
 			writer = new BufferedWriter(
-					new FileWriter(CommonsDefine.OUTPUT_PATH + "/label_" + fileName));
+					new FileWriter(CommonsDefine.OUTPUT_PATH + "label_" + fileName));
 
 			int len = 50;
 			Stack<Integer> stack = new Stack<>();
@@ -629,7 +838,7 @@ public class Lexer {
 	public void outputLabelSrc() {
 		recorder.insertLine("====================Labeled C Code==================");
 		
-		String path = CommonsDefine.OUTPUT_PATH + "/label_" + srcName;
+		String path = CommonsDefine.OUTPUT_PATH + "label_" + srcName;
 		BufferedReader reader = null;
 		try {
 			reader = new BufferedReader(new FileReader(path));
@@ -670,6 +879,12 @@ public class Lexer {
 		}
 	}
 	
+	public void printAll() {
+		for (String string : sources) {
+			System.out.println(string);
+		}
+	}
+	
 	// 输出词法分析后的结果
 	public void outputLexer() {
 		BufferedWriter writer = null;
@@ -703,13 +918,13 @@ public class Lexer {
 		// 公共记录
 		Recorder recorder = new Recorder();
 		
-		String srcPath = "src/main/resources/input/evenSum.c";
+		String srcPath = "conf/input/test9.c";
 		Lexer lexer = new Lexer(srcPath, recorder);
 		lexer.runLexer();
 		lexer.outputSrc();
 //		lexer.outputLabels();
 		lexer.outputLabelSrc();
 		lexer.outputLexer();
+	
 	}
-
 }

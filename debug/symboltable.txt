@@ -1,0 +1,8 @@
+变量名称	变量类型	内存地址
+a	char	8
+b	char	12
+c	char	16
+ans	int	20
+bss_tmp1	char	24
+.LC1	null	null
+.LC0	null	null
