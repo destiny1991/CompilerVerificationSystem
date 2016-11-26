@@ -37,8 +37,9 @@ int f(int a) {                                    // 6
         return 1;                                 // 6.2.1
     }                                             // 6.3
     tmp = g(a, (a * 2));                          // 6.4
+    tmp = f(a);                                   // 6.5
 
-    return a * tmp;                               // 6.5
+    return a * tmp;                               // 6.6
 }                                                 // 7
 
 int g(int b, int c) {                             // 8

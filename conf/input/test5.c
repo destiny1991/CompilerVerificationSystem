@@ -1,6 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+int add();
+
+int sub();
+
+int mul();
+
 int main() {
     float a, b, c;
     float d;

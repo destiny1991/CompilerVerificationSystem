@@ -1,31 +1,37 @@
 #include <stdio.h>                                // 1
 #include <stdlib.h>                               // 2
 
-int main() {                                      // 3
-    float a, b, c;                                // 3.1
-    float d;                                      // 3.2
+int add();                                        // 3
 
-    scanf("%f %f %f %f", &a, &b, &c, &d);         // 3.3
-    printf("%f %f %f %f", a, b, c, d);            // 3.4
+int sub();                                        // 4
 
-     a = 1.2f;                                    // 3.5
-    b = 1.3F;                                     // 3.6
-    c = a * b + a;                                // 3.7
+int mul();                                        // 5
 
-    a > 1;                                        // 3.8
+int main() {                                      // 6
+    float a, b, c;                                // 6.1
+    float d;                                      // 6.2
+
+    scanf("%f %f %f %f", &a, &b, &c, &d);         // 6.3
+    printf("%f %f %f %f", a, b, c, d);            // 6.4
+
+     a = 1.2f;                                    // 6.5
+    b = 1.3F;                                     // 6.6
+    c = a * b + a;                                // 6.7
+
+    a > 1;                                        // 6.8
 
 
-    return 0;                                     // 3.9
-}                                                 // 4
+    return 0;                                     // 6.9
+}                                                 // 7
 
-int add() {                                       // 5
+int add() {                                       // 8
 
-}                                                 // 6
+}                                                 // 9
 
-int sub() {                                       // 7
+int sub() {                                       // 10
 
-}                                                 // 8
+}                                                 // 11
 
-int mul() {                                       // 9
+int mul() {                                       // 12
 	
-}                                                 // 10
+}                                                 // 13
