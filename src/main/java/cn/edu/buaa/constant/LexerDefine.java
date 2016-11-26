@@ -14,10 +14,14 @@ public class LexerDefine {
 		private static final long serialVersionUID = 1L;
 		{
 			put("include", "INCLUDE");
+			
 			put("char", "CHAR");
 			put("int", "INT");
+			put("long", "LONG");
+			put("short", "SHORT");
 			put("float", "FLOAT");
 			put("double", "DOUBLE");
+			
 			put("for", "FOR");
 			put("if", "IF");
 			put("else", "ELSE");
@@ -90,7 +94,7 @@ public class LexerDefine {
 	
 	// 关键字
 	public static final String[][] keywords = { 
-			{ "int", "float", "double", "char", "void" },
+			{ "int", "long", "short", "float", "double", "char", "void" },
 			{ "if", "for", "while", "do", "else" }, 
 			{ "include", "return", "break", "continue", "goto" } 
 	};

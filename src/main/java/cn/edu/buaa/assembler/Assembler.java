@@ -334,7 +334,13 @@ public class Assembler {
 				tmpMap.put("type", variableType);
 				tmpMap.put("field_type", variableFieldType);
 				tmpMap.put("register", Integer.toString(assemblerDTO.getMemAdress()));
-				assemblerDTO.addToMemAdress(4);
+								
+				if (variableFieldType.equals("short") || variableFieldType.equals("char")) {
+					assemblerDTO.addToMemAdress(2);
+				} else {
+					assemblerDTO.addToMemAdress(4);
+				}
+				
 				assemblerDTO.putIntoSymbolTable(variableName, tmpMap);
 
 			// 数组元素
@@ -414,7 +420,12 @@ public class Assembler {
 						// 地址符号，不处理
 					} else if (tmpNode.getType().equals("BIT_AND")) {
 						logger.debug("BIT_AND : " + tmpNode.getValue());
-
+						
+						// 参数表达式
+					} else if (tmpNode.getType().equals("SingleOrDoubleOperand")) {
+						Map<String, String> expres = _expression(tmpNode);
+						parameterList.add(expres.get("value"));
+						
 					} else {
 						try {
 							throw new Exception("Error in _functionCall : " + tmpNode.getType());
@@ -451,7 +462,7 @@ public class Assembler {
 					assemblerDTO.insertIntoText(line, label);
 
 					// 参数为变量
-				} else if (parameterType.equals("VARIABLE")) {
+				} else if (parameterType.equals("VARIABLE") || parameterType.equals("IDENTIFIER")) {
 					String fieldType = assemblerDTO.getMapFromSymbolTable(parameter).get("field_type");
 					if (fieldType.equals("int") || fieldType.equals("long")) {
 						line = AssemblerUtils.PREFIX + "lwz " + num + "," + assemblerDTO.getVariableSymbolOrNumber(parameter) + "(31)";
@@ -472,13 +483,19 @@ public class Assembler {
 						line = AssemblerUtils.PREFIX + "lbz " + num + "," + assemblerDTO.getVariableSymbolOrNumber(parameter) + "(31)";
 						num++;
 						assemblerDTO.insertIntoText(line, label);
+						
+					} else if (fieldType.equals("short")) { 
+						line = AssemblerUtils.PREFIX + "lhz " + num + "," + assemblerDTO.getVariableSymbolOrNumber(parameter) + "(31)";
+						num++;
+						assemblerDTO.insertIntoText(line, label);
+					
 					} else {
 						logger.debug("More type will be added to printf : " + fieldType);
 
 					}
 				
 				// 为数字常量
-				} else if (parameterType.equals("DIGIT_CONSTANT")) { 
+				} else if (parameterType.equals("DIGIT_CONSTANT")) {
 					// 判断数字是什么类型
 					if (parameter.contains(".")) {
 						// float
@@ -557,7 +574,7 @@ public class Assembler {
 							num++;
 							assemblerDTO.insertIntoText(line, label);
 							
-						// int
+						// int or short
 						} else {
 							line = AssemblerUtils.PREFIX + "li " + num + "," + parameter;
 							num++;
@@ -586,7 +603,7 @@ public class Assembler {
 			}
 			assemblerDTO.insertIntoText(line, label);
 			
-		// 其它类型的函数, 只处理无返回值的函数类型
+		// 其它类型的函数
 		} else {
 			int num = 3;
 			for (int i = 0; i < parameterList.size(); i++) {
@@ -602,7 +619,7 @@ public class Assembler {
 					assemblerDTO.insertIntoText(line, label);
 
 					// 参数为变量
-				} else if (parameterType.equals("VARIABLE")) {
+				} else if (parameterType.equals("VARIABLE") || parameterType.equals("IDENTIFIER")) {
 					String fieldType = assemblerDTO.getMapFromSymbolTable(parameter).get("field_type");
 					if (fieldType.equals("int") || fieldType.equals("long")) {
 						line = AssemblerUtils.PREFIX + "lwz " + num + "," + assemblerDTO.getVariableSymbolOrNumber(parameter) + "(31)";
@@ -619,13 +636,23 @@ public class Assembler {
 						num++;
 						assemblerDTO.insertIntoText(line, label);
 						
+					} else if (fieldType.equals("char")) { 
+						line = AssemblerUtils.PREFIX + "lbz " + num + "," + assemblerDTO.getVariableSymbolOrNumber(parameter) + "(31)";
+						num++;
+						assemblerDTO.insertIntoText(line, label); 
+					
+					} else if (fieldType.equals("short")) { 
+						line = AssemblerUtils.PREFIX + "lhz " + num + "," + assemblerDTO.getVariableSymbolOrNumber(parameter) + "(31)";
+						num++;
+						assemblerDTO.insertIntoText(line, label); 
+					
 					} else {
 						logger.debug("More type will be added to printf : " + fieldType);
 
 					}
 				
 				// 为数字常量
-				} else if (parameterType.equals("DIGIT_CONSTANT")) { 
+				} else if (parameterType.equals("DIGIT_CONSTANT")) {
 					// 判断数字是什么类型
 					if (parameter.contains(".")) {
 						// float
@@ -692,8 +719,19 @@ public class Assembler {
 							line = AssemblerUtils.PREFIX + "li " + num + "," + parameter.substring(0, parameter.length() - 1);
 							num++;
 							assemblerDTO.insertIntoText(line, label);
+						
+						// char
+						} else if (parameter.startsWith("'") && parameter.endsWith("'")) {
+							int pos = 1;
+							if (parameter.charAt(pos) == '\\') {
+								pos++;
+							}
 							
-						// int
+							line = AssemblerUtils.PREFIX + "li " + num + "," + (int) parameter.charAt(pos);
+							num++;
+							assemblerDTO.insertIntoText(line, label); 
+							
+						// int or short
 						} else {
 							line = AssemblerUtils.PREFIX + "li " + num + "," + parameter;
 							num++;
@@ -705,7 +743,7 @@ public class Assembler {
 				} else {
 					try {
 						throw new Exception("Other variable type not support : "
-								+ assemblerDTO.getMapFromSymbolTable(parameter).get("type"));
+								+ assemblerDTO.getMapFromSymbolTable(parameter).get("type") + " " + parameter);
 					} catch (Exception e) {
 						e.printStackTrace();
 						System.exit(1);
@@ -890,6 +928,32 @@ public class Assembler {
 
 				}
 				
+			} else if (fieldType.equals("short")) {
+				// 常数
+				if (expres.get("type").equals("CONSTANT")) {
+					line = AssemblerUtils.PREFIX + "li 0," + expres.get("value");					
+					assemblerDTO.insertIntoText(line, label);
+					line = AssemblerUtils.PREFIX + "sth 0," + assemblerDTO.getVariableSymbolOrNumber(currentNode.getValue()) + "(31)";
+					assemblerDTO.insertIntoText(line, label);
+
+					// 变量
+				} else if (expres.get("type").equals("VARIABLE")) {
+					// 把数放到r0中，再把r0总的数转到目标寄存器中, 同float
+					line = AssemblerUtils.PREFIX + "lbz 0," + assemblerDTO.getVariableSymbolOrNumber(expres.get("value")) + "(31)";
+					assemblerDTO.insertIntoText(line, label);
+					line = AssemblerUtils.PREFIX + "sth 0," + assemblerDTO.getVariableSymbolOrNumber(currentNode.getValue()) + "(31)";
+					assemblerDTO.insertIntoText(line, label);
+
+				} else {
+					try {
+						throw new Exception("_assignment only support constant and varivale : " + expres.get("type"));
+					} catch (Exception e) {
+						e.printStackTrace();
+						System.exit(1);
+					}
+
+				}
+				
 			} else {
 				try {
 					throw new Exception("Not support this type : " + fieldType);
@@ -916,6 +980,12 @@ public class Assembler {
 			} else if(returnType.equals("float")) {
 				line = AssemblerUtils.PREFIX + "stfs 3," + assemblerDTO.getVariableSymbolOrNumber(currentNode.getValue()) + "(31)";
 			
+			}  else if (returnType.equals("char")) {
+				line = AssemblerUtils.PREFIX + "stb 3," + assemblerDTO.getVariableSymbolOrNumber(currentNode.getValue()) + "(31)";
+				
+			} else if (returnType.equals("short")) {
+				line = AssemblerUtils.PREFIX + "sth 3," + assemblerDTO.getVariableSymbolOrNumber(currentNode.getValue()) + "(31)";
+				
 			} else {
 				throw new RuntimeException(" = not support type : " + returnType);
 				
@@ -1320,7 +1390,8 @@ public class Assembler {
 			assemblerDTO.insertIntoText(line, label);
 
 		} else if (expres.get("type").equals("VARIABLE")) {
-			line = AssemblerUtils.PREFIX + "lwz 0," + assemblerDTO.getVariableSymbolOrNumber(expres.get("value")) + "(31)";
+			line = AssemblerUtils.PREFIX + "lwz 0," 
+					+ assemblerDTO.getVariableSymbolOrNumber(expres.get("value")) + "(31)";
 			assemblerDTO.insertIntoText(line, label); 
 			line = AssemblerUtils.PREFIX + "mr 3,0";
 			assemblerDTO.insertIntoText(line, label);
@@ -1383,6 +1454,5 @@ public class Assembler {
 		assembler.generateAssemblerFile(srcPath);
 		assembler.generateSymbolTableFile();
 		assembler.outputAssembler();	
-
 	}
 }

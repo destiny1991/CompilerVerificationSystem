@@ -1,18 +1,22 @@
 #include <stdio.h>
-#include <stdlib.h>
 
 int main() {
-    int a;
-    int b;
-    int c;
-    int d;
+    short a;
+    short b;
+    short c;
+    short d;
 
-
-    scanf("%d %d %d %d", &a, &b, &c, &d);
+    scanf("%hd %hd %hd %hd", &a, &b, &c, &d);
 
     //a = (a | c) || (b & c) && !d;
 
-    a = b + c - d + a;
+    a = 34 + b;
+    c = a + b;
+    a = 12 + 12;
+    
+    printf("%hd", a);
+    printf("%hd", b + 23);
+
 
     return 0;
 }
