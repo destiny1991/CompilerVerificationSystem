@@ -23,10 +23,9 @@ int main() {                                      // 4
         
         }                                         // 4.8.4
     }                                             // 4.9
+    printf("sum is %d", sum);                     // 4.10
 
-    tmp = f(n);                                   // 4.10
-
-    printf("sum is %d", sum);                     // 4.11
+    tmp = f(n);                                   // 4.11
 
     return 0;                                     // 4.12
 }                                                 // 5

@@ -4,9 +4,9 @@
 	.align 2                                         # 4.6_fc
 .LC0:	                                            # 4.6_fc
 	.string	"%d %f %f"                               # 4.6_fc
-	.align 2                                         # 4.11_fc
-.LC5:	                                            # 4.11_fc
-	.string	"sum is %d"                              # 4.11_fc
+	.align 2                                         # 4.10_fc
+.LC5:	                                            # 4.10_fc
+	.string	"sum is %d"                              # 4.10_fc
 
 	.section ".text"
 	.align 2                                         # 4_fs
@@ -100,17 +100,17 @@ main:	                                            # 4_fs
 	cmpi 7,0,0,0                                     # 4.8_fo
 	bne 7,.L2                                        # 4.8_fo
 
-	lwz 3,8(31)                                      # 4.10_fc
-	bl f                                             # 4.10_fc
+	lis 0,.LC5@ha                                    # 4.10_fc
+	addic 0,0,.LC5@l                                 # 4.10_fc
+	mr 3,0                                           # 4.10_fc
+	lwz 4,16(31)                                     # 4.10_fc
+	crxor 6,6,6                                      # 4.10_fc
+	bl printf                                        # 4.10_fc
 
-	stw 3,20(31)                                     # 4.10_as
+	lwz 3,8(31)                                      # 4.11_fc
+	bl f                                             # 4.11_fc
 
-	lis 0,.LC5@ha                                    # 4.11_fc
-	addic 0,0,.LC5@l                                 # 4.11_fc
-	mr 3,0                                           # 4.11_fc
-	lwz 4,16(31)                                     # 4.11_fc
-	crxor 6,6,6                                      # 4.11_fc
-	bl printf                                        # 4.11_fc
+	stw 3,20(31)                                     # 4.11_as
 
 	li 0,0                                           # 4.12_re
 	mr 3,0                                           # 4.12_re

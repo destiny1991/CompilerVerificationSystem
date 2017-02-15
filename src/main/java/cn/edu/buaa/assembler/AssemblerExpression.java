@@ -9,7 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import cn.edu.buaa.constant.AssemblerDefine;
-import cn.edu.buaa.pojo.SyntaxTreeNode;
+import cn.edu.buaa.pojo.SyntaxUnitNode;
+import cn.edu.buaa.prover.Prover;
 
 public class AssemblerExpression {
 			
@@ -28,12 +29,17 @@ public class AssemblerExpression {
 	private static int bss_tmp_cnt;
 	
 	// 处理表达式
-	public static Map<String, String> handle(SyntaxTreeNode node, AssemblerDTO assemblerDTO) {
+	public static Map<String, String> handle(SyntaxUnitNode node, AssemblerDTO assemblerDTO, Prover prover) {
+		SyntaxUnitNode t = node;
+		while (t.getLabel() == null || t.getLabel().trim().length() == 0) {
+			t = t.getFirstSon();
+		}
+		
 		// 处理常量
-		if(node.getType().equals("Constant")) {
+		if (t.getType().equals("_Constant")) {
 			Map<String, String> tmpMap = new HashMap<>();
 			tmpMap.put("type", "CONSTANT");
-			tmpMap.put("value", node.getFirstSon().getValue());
+			tmpMap.put("value", t.getValue());
 			return tmpMap;
 		}
 		
@@ -107,11 +113,13 @@ public class AssemblerExpression {
 			result.put("value", "");
 		}
 		
+		prover.runProver("expression", t.getLabel());
+		
 		return result;
 	}
 
 	// 从表达式中识别出操作数和操作符号
-	private static void traverseExpression(SyntaxTreeNode node) {
+	public static void traverseExpression(SyntaxUnitNode node) {
 		if (node == null) {
 			return;
 		}
@@ -147,7 +155,7 @@ public class AssemblerExpression {
 		
 		// 为非叶子节点，故需要递归遍历
 		} else {
-			SyntaxTreeNode currentNode = node.getFirstSon();
+			SyntaxUnitNode currentNode = node.getFirstSon();
 			while(currentNode != null) {
 				traverseExpression(currentNode);
 				currentNode = currentNode.getRight();
@@ -258,7 +266,7 @@ public class AssemblerExpression {
 	}
 	
 	// 处理双目运算
-	private static void solveTwoOperator(String operator, String label) {
+	public static void solveTwoOperator(String operator, String label) {
 		Map<String, String> operand_b = operandStack.pop();
 		Map<String, String> operand_a = operandStack.pop();
 				
@@ -4150,7 +4158,7 @@ public class AssemblerExpression {
 	
 	
 	// 处理单目运算
-	private static void solveOneOperator(String operator, String label) {
+	public static void solveOneOperator(String operator, String label) {
 		// 取出操作数
 		Map<String, String> operand = operandStack.pop();
 		

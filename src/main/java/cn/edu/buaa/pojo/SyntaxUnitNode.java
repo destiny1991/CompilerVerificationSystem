@@ -2,7 +2,7 @@ package cn.edu.buaa.pojo;
 
 import java.util.Map;
 
-public class SyntaxTreeNode {
+public class SyntaxUnitNode {
 
 	// 节点的值，为文法中的终结符或者非终结符
 	private String value;
@@ -13,21 +13,20 @@ public class SyntaxTreeNode {
 	// token的标号
 	private String label;
 	
-	// 构造语法树的相关信息
-	private SyntaxTreeNode father;
-	private SyntaxTreeNode left;
-	private SyntaxTreeNode right;
-	private SyntaxTreeNode firstSon;
+	private SyntaxUnitNode father;
+	private SyntaxUnitNode left;
+	private SyntaxUnitNode right;
+	private SyntaxUnitNode firstSon;
 	
-	public SyntaxTreeNode(String value) {
+	public SyntaxUnitNode(String value) {
 		this(value, null, null);
 	}
 	
-	public SyntaxTreeNode(String value, String type, String label) {
+	public SyntaxUnitNode(String value, String type, String label) {
 		this(value, type, null, label);
 	}
 	
-	public SyntaxTreeNode(String value, String type, Map<String, String> extraInfo, String label) {
+	public SyntaxUnitNode(String value, String type, Map<String, String> extraInfo, String label) {
 		this.value = value;
 		this.type = type;
 		this.extraInfo = extraInfo;
@@ -65,34 +64,34 @@ public class SyntaxTreeNode {
 		this.label = label;
 	}
 	
-	public SyntaxTreeNode getFather() {
+	public SyntaxUnitNode getFather() {
 		return father;
 	}
 	
-	public void setFather(SyntaxTreeNode father) {
+	public void setFather(SyntaxUnitNode father) {
 		this.father = father;
 	}
-	public SyntaxTreeNode getLeft() {
+	public SyntaxUnitNode getLeft() {
 		return left;
 	}
 	
-	public void setLeft(SyntaxTreeNode left) {
+	public void setLeft(SyntaxUnitNode left) {
 		this.left = left;
 	}
 	
-	public SyntaxTreeNode getRight() {
+	public SyntaxUnitNode getRight() {
 		return right;
 	}
 	
-	public void setRight(SyntaxTreeNode right) {
+	public void setRight(SyntaxUnitNode right) {
 		this.right = right;
 	}
 	
-	public SyntaxTreeNode getFirstSon() {
+	public SyntaxUnitNode getFirstSon() {
 		return firstSon;
 	}
 	
-	public void setFirstSon(SyntaxTreeNode firstSon) {
+	public void setFirstSon(SyntaxUnitNode firstSon) {
 		this.firstSon = firstSon;
 	}
 	

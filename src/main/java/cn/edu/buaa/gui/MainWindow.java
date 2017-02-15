@@ -19,8 +19,8 @@ import com.seaglasslookandfeel.SeaGlassLookAndFeel;
 
 import cn.edu.buaa.assembler.Assembler;
 import cn.edu.buaa.lexer.Lexer;
-import cn.edu.buaa.parser.Parser;
 import cn.edu.buaa.prover.Prover;
+import cn.edu.buaa.recognizer.Recognizer;
 import cn.edu.buaa.recorder.Recorder;
 
 import java.awt.event.KeyAdapter;
@@ -455,7 +455,7 @@ public class MainWindow extends JFrame {
 			public void mouseClicked(MouseEvent e) {
 				sourceModel.reload(sourceRoot.getLastChild());
 				goalModel.reload(goalRoot.getLastChild());
-				proveModel.reload(goalRoot.getLastChild());
+				proveModel.reload(proveRoot.getLastChild());
 			}
 		});
 
@@ -559,12 +559,12 @@ public class MainWindow extends JFrame {
 				lexer.outputLabelSrc();
 				lexer.outputLexer();
 				
-				Parser parser = new Parser(lexer.getTokens(), recorder);
-				parser.runParser();
-				parser.outputParser();
+				Recognizer parser = new Recognizer(lexer.getTokens(), recorder);
+				parser.runRecognizer();
+				parser.outputRecognizer();
 
 				Prover prover = new Prover(recorder, srcPath);
-				Assembler assembler = new Assembler(parser.getTree(), recorder, prover);
+				Assembler assembler = new Assembler(parser.getCollections(), recorder, prover);
 				assembler.runAssembler();
 				assembler.generateAssemblerFile(srcPath);
 				assembler.generateSymbolTableFile();
@@ -785,7 +785,7 @@ public class MainWindow extends JFrame {
 		}
 	}
 	
-	private boolean isParentAndSon(DefaultMutableTreeNode cur, DefaultMutableTreeNode newNode) {
+	public boolean isParentAndSon(DefaultMutableTreeNode cur, DefaultMutableTreeNode newNode) {
 		Node a = (Node) cur.getUserObject();
 		Node b = (Node) newNode.getUserObject();
 		
