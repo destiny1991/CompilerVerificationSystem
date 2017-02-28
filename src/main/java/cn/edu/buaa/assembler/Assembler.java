@@ -17,7 +17,6 @@ import cn.edu.buaa.recorder.Recorder;
 
 public class Assembler {
 
-	// 语法分析传过来的语法树
 	private SyntaxUnitCollections collections;
 
 	// 汇编代码生成过程中需要用到的公共数据
@@ -54,7 +53,7 @@ public class Assembler {
 		logger.info("目标码生成开始...");
 		recorder.insertLine("目标码生成开始...");
 		
-		// 从语法树的根节点开始遍历
+		// 从根节点开始遍历
 		traverse(collections.getRoot());
 		
 		recorder.insertLine("目标码生成结束!");
@@ -288,7 +287,7 @@ public class Assembler {
 
 			currentNode = currentNode.getRight();
 		}
-		prover.runProver("functionStatement", label);
+		prover.runProver("functionStatement", label, null);
 		
 	}
 	
@@ -758,7 +757,7 @@ public class Assembler {
 		}
 
 		assemblerDTO.insertIntoText("", null);  // 增加一个空行
-		prover.runProver("functionCall", label);
+		prover.runProver("functionCall", label, null);
 	}
 
 	// 赋值语句
@@ -1000,12 +999,15 @@ public class Assembler {
 		}
 
 		assemblerDTO.insertIntoText("", null);
-		prover.runProver("assignment", label);
+		prover.runProver("assignment", label, null);
 		
 	}
 
 	// if-else语句
 	private void _controlIfElse(SyntaxUnitNode node) {
+		
+		List<String> segments = new ArrayList<>();
+		
 		// 暂存if-else中的标签
 		Map<String, String> labelsIfelse = new HashMap<>();
 		labelsIfelse.put("label_else", ".L" + assemblerDTO.getLabelCnt());
@@ -1044,10 +1046,13 @@ public class Assembler {
 				
 				line = AssemblerUtils.PREFIX + "lwz 0," + assemblerDTO.getVariableSymbolOrNumber(expres.get("value")) + "(31)";
 				assemblerDTO.insertIntoText(line,ifLabel);
+				segments.add(line);
 				line = AssemblerUtils.PREFIX + "cmpi 7,0,0,0";
 				assemblerDTO.insertIntoText(line, ifLabel);
+				segments.add(line);
 				line = AssemblerUtils.PREFIX + "beq 7," + labelsIfelse.get("label_else");
 				assemblerDTO.insertIntoText(line, ifLabel);
+				segments.add(line);
 				assemblerDTO.insertIntoText("", null);// 插入一个空行
 				
 				traverse(currentNode.getFirstSon().getRight().getFirstSon());
@@ -1056,10 +1061,12 @@ public class Assembler {
 				if (isIfElse) {
 					line = AssemblerUtils.PREFIX + "b " + labelsIfelse.get("label_end");
 					assemblerDTO.insertIntoText(line, elseLabel);
+					segments.add(line);
 				}
 				
 				line = labelsIfelse.get("label_else") + ":";
 				assemblerDTO.insertIntoText(line, ifLabel);
+				segments.add(line);
 				
 				// 插入一个空行
 				assemblerDTO.insertIntoText("", null);
@@ -1069,6 +1076,7 @@ public class Assembler {
 				
 				line = labelsIfelse.get("label_end") + ":";
 				assemblerDTO.insertIntoText(line, elseLabel);
+				segments.add(line);
 				// 插入一个空行
 				assemblerDTO.insertIntoText("", null);
 
@@ -1089,7 +1097,7 @@ public class Assembler {
 		if (isIfElse) {
 			recorder.insertLine("if-else语句验证开始...");
 			logger.info("if-else语句验证开始...");
-			valid = prover.runProver("if_else", ifLabel + ", " + elseLabel);
+			valid = prover.runProver("if_else", ifLabel + ", " + elseLabel, segments);
 			if (valid) {
 				recorder.insertLine("if-else语句验证结果 : 验证成功");
 				logger.info("if-else语句验证结果 : 验证成功");
@@ -1105,7 +1113,7 @@ public class Assembler {
 		} else {
 			recorder.insertLine("if语句验证开始...");
 			logger.info("if语句验证开始...");
-			valid = prover.runProver("if", ifLabel);
+			valid = prover.runProver("if", ifLabel, segments);
 			if (valid) {
 				recorder.insertLine("if语句验证结果 : 验证成功");
 				logger.info("if语句验证结果 : 验证成功");
@@ -1124,6 +1132,9 @@ public class Assembler {
 
 	// for语句
 	private void _controlFor(SyntaxUnitNode node) {
+		
+		List<String> segments = new ArrayList<>();
+		
 		// 暂存for开始和结束的标签
 		Map<String, String> labelsFor = new HashMap<>();
 		labelsFor.put("label1", ".L" + assemblerDTO.getLabelCnt());
@@ -1153,8 +1164,10 @@ public class Assembler {
 					cnt++;
 					line = AssemblerUtils.PREFIX + "b " + labelsFor.get("label1");
 					assemblerDTO.insertIntoText(line, label);
+					segments.add(line);
 					line = labelsFor.get("label2") + ":";
 					assemblerDTO.insertIntoText(line, label);
+					segments.add(line);
 
 					// 留到后面再处理
 					forCondition = currentNode;
@@ -1185,14 +1198,18 @@ public class Assembler {
 
 		line = labelsFor.get("label1") + ":";
 		assemblerDTO.insertIntoText(line, label);
+		segments.add(line);
 		// 延迟到此处才处理条件表达式
 		Map<String, String> expres = _expression(forCondition);
 		line = AssemblerUtils.PREFIX + "lwz 0," + assemblerDTO.getVariableSymbolOrNumber(expres.get("value")) + "(31)";
 		assemblerDTO.insertIntoText(line, label);
+		segments.add(line);
 		line = AssemblerUtils.PREFIX + "cmpi 7,0,0,0";
 		assemblerDTO.insertIntoText(line, label);
+		segments.add(line);
 		line = AssemblerUtils.PREFIX + "bne 7," + labelsFor.get("label2");
 		assemblerDTO.insertIntoText(line, label);
+		segments.add(line);
 
 		// 增加一个空行
 		assemblerDTO.insertIntoText("", null);
@@ -1200,7 +1217,7 @@ public class Assembler {
 		boolean valid = false;
 		recorder.insertLine("for语句验证开始...");
 		logger.info("for语句验证开始...");
-		valid = prover.runProver("for", label);
+		valid = prover.runProver("for", label, segments);
 		if (valid) {
 			recorder.insertLine("for语句验证结果 : 验证成功");
 			logger.info("for语句验证结果 : 验证成功");
@@ -1217,6 +1234,9 @@ public class Assembler {
 
 	// while语句
 	private void _controlWhile(SyntaxUnitNode node) {
+		
+		List<String> segments = new ArrayList<>();
+		
 		// 暂存while开始和结束的标签
 		Map<String, String> labelsWhile = new HashMap<>();
 		labelsWhile.put("label1", ".L" + assemblerDTO.getLabelCnt());
@@ -1244,8 +1264,10 @@ public class Assembler {
 			if (currentNode.getValue().equals("Expression")) {
 				line = AssemblerUtils.PREFIX + "b " + labelsWhile.get("label1");
 				assemblerDTO.insertIntoText(line, label);
+				segments.add(line);
 				line = labelsWhile.get("label2") + ":";
 				assemblerDTO.insertIntoText(line, label);
+				segments.add(line);
 				whileCondition = currentNode;
 
 				// while循环体
@@ -1267,13 +1289,17 @@ public class Assembler {
 
 		line = labelsWhile.get("label1") + ":";
 		assemblerDTO.insertIntoText(line, label);
+		segments.add(line);
 		Map<String, String> expres = _expression(whileCondition);
 		line = AssemblerUtils.PREFIX + "lwz 0," + assemblerDTO.getVariableSymbolOrNumber(expres.get("value")) + "(31)";
 		assemblerDTO.insertIntoText(line, label);
+		segments.add(line);
 		line = AssemblerUtils.PREFIX + "cmpi 7,0,0,0";
 		assemblerDTO.insertIntoText(line, label);
+		segments.add(line);
 		line = AssemblerUtils.PREFIX + "bne 7," + labelsWhile.get("label2");
 		assemblerDTO.insertIntoText(line, label);
+		segments.add(line);
 
 		// 增加一个空行
 		assemblerDTO.insertIntoData("", null);
@@ -1281,7 +1307,7 @@ public class Assembler {
 		boolean valid = false;
 		recorder.insertLine("while语句验证开始...");
 		logger.info("while语句验证开始...");
-		valid = prover.runProver("while", label);
+		valid = prover.runProver("while", label, segments);
 		if (valid) {
 			recorder.insertLine("while语句验证结果 : 验证成功");
 			logger.info("while语句验证结果 : 验证成功");
@@ -1298,6 +1324,9 @@ public class Assembler {
 
 	// do-while语句
 	private void _controlDoWhile(SyntaxUnitNode node) {
+		
+		List<String> segments = new ArrayList<>();
+		
 		// 暂存标签
 		Map<String, String> labelsDoWhile = new HashMap<>();
 		labelsDoWhile.put("label1", ".L" + assemblerDTO.getLabelCnt());
@@ -1319,6 +1348,7 @@ public class Assembler {
 		String label = node.getLabel();
 		line = labelsDoWhile.get("label1") + ":";
 		assemblerDTO.insertIntoText(line, label);
+		segments.add(line);
 
 		SyntaxUnitNode currentNode = node.getFirstSon();
 		while (currentNode != null) {
@@ -1331,10 +1361,13 @@ public class Assembler {
 				Map<String, String> expres = _expression(currentNode);
 				line = AssemblerUtils.PREFIX + "lwz 0," + assemblerDTO.getVariableSymbolOrNumber(expres.get("value")) + "(31)";
 				assemblerDTO.insertIntoText(line, label);
+				segments.add(line);
 				line = AssemblerUtils.PREFIX + "cmpi 7,0,0,0";
 				assemblerDTO.insertIntoText(line, label);
+				segments.add(line);
 				line = AssemblerUtils.PREFIX + "bne 7," + labelsDoWhile.get("label1");
 				assemblerDTO.insertIntoText(line, label);
+				segments.add(line);
 
 			} else {
 				try {
@@ -1355,7 +1388,7 @@ public class Assembler {
 		boolean valid = false;
 		recorder.insertLine("do-while语句验证开始...");
 		logger.info("do-while语句验证开始...");
-		valid = prover.runProver("do_while", label);
+		valid = prover.runProver("do_while", label, segments);
 		if (valid) {
 			recorder.insertLine("do-while语句验证结果 : 验证成功");
 			logger.info("do-while语句验证结果 : 验证成功");
@@ -1409,7 +1442,7 @@ public class Assembler {
 			}
 		}
 		
-		prover.runProver("return", label);
+		prover.runProver("return", label, null);
 	}
 
 	// 表达式（封装到静态类中）

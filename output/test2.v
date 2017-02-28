@@ -1,3 +1,18 @@
+functionCall : 3.5_fc
+	Semantic verify correct
+
+assignment : 3.6_as
+	Semantic verify correct
+
+expression : 3.7.1_ex
+	Semantic verify correct
+
+expression : 3.7.1.1_ex
+	Semantic verify correct
+
+assignment : 3.7.1.1_as
+	Semantic verify correct
+
 if : 3.7.1_if
 目标码模式命题 :
 P1 = GPR[0] = <LOG-EXP>
@@ -16,6 +31,18 @@ S7 = .L1:		P5
 S8 = (<LOG-EXP> < 0 -> PC = PC + 4 || <LOG-EXP> > 0 -> PC = PC + 4 || <LOG-EXP> == 0 -> PC = PC + @.L1) ∧ (<STA-LIST>) ∧ (.L1:)		S5, S6, S7, CI
 S9 = (<LOG-EXP> != 0 -> <STA-LIST> || <LOG-EXP> == 0 -> null)		S8, REDUCE
 S10 = (<LOG-EXP> != 0 -> σ(<STA-LIST>) || <LOG-EXP> == 0 -> skip)		S9, σ
+
+expression : 3.7.3_ex
+	Semantic verify correct
+
+assignment : 3.7.3_as
+	Semantic verify correct
+
+expression : 3.7.4_ex
+	Semantic verify correct
+
+expression : 3.8_ex
+	Semantic verify correct
 
 do_while : 3.7_dw
 目标码模式命题 :
@@ -39,6 +66,33 @@ S9 = (<STA-LIST>) ∧ (<LOG-EXP> != 0 -> <STA-LIST> || <LOG-EXP> == 0 -> null)		
 S10 = (σ(<STA-LIST>)) ∧ (<LOG-EXP> != 0 -> σ(<STA-LIST>) || <LOG-EXP> == 0 -> skip)		S9, σ
 S11 = (σ(<STA-LIST>)) ∧ ({<LOG-EXP> != 0 -> σ(<STA-LIST>)} ** N || <LOG-EXP> == 0 -> skip)		P0, n = N
 S12 = (σ(<STA-LIST>)) ∧ ({<LOG-EXP> != 0 -> σ(<STA-LIST>)} ** (N + 1) || <LOG-EXP> == 0 -> skip)		S10, S11, CI
+
+functionCall : 3.9_fc
+	Semantic verify correct
+
+functionCall : 3.10_fc
+	Semantic verify correct
+
+assignment : 3.11_as
+	Semantic verify correct
+
+expression : 3.12_ex
+	Semantic verify correct
+
+assignment : 3.12_as
+	Semantic verify correct
+
+expression : 3.13.1_ex
+	Semantic verify correct
+
+expression : 3.13.2_ex
+	Semantic verify correct
+
+assignment : 3.13.2_as
+	Semantic verify correct
+
+expression : 3.13_ex
+	Semantic verify correct
 
 while : 3.13_wh
 目标码模式命题 :
@@ -66,6 +120,21 @@ S11 = (<LOG-EXP> != 0 -> <STA-LIST> || <LOG-EXP> == 0 -> null)		S10, REDUCE
 S12 = (<LOG-EXP> != 0 -> σ(<STA-LIST>) || <LOG-EXP> == 0 -> skip)		S11, σ
 S13 = ({<LOG-EXP> != 0 -> σ(<STA-LIST>)} ** N || <LOG-EXP> == 0 -> skip)		P0, n = N
 S14 = ({<LOG-EXP> != 0 -> σ(<STA-LIST>)} ** (N + 1) || <LOG-EXP> == 0 -> skip)		S12, S13, CI
+
+functionCall : 3.15_fc
+	Semantic verify correct
+
+assignment : 3.16_as
+	Semantic verify correct
+
+expression : 3.16.1_ex
+	Semantic verify correct
+
+expression : 3.16_ex
+	Semantic verify correct
+
+expression : 3.16_ex
+	Semantic verify correct
 
 for : 3.16_fo
 目标码模式命题 :
@@ -97,4 +166,10 @@ S13 = (<ASS-EXP_1>) ∧ (<LOG-EXP> != 0 -> <STA-LIST>; <ASS-EXP_2> || <LOG-EXP> 
 S14 = (σ(<ASS-EXP_1>)) ∧ (<LOG-EXP> != 0 -> [σ(<STA-LIST>); σ(<ASS-EXP_2>)] || <LOG-EXP> == 0 -> skip)		S13, σ
 S15 = (σ(<ASS-EXP_1>)) ∧ ({<LOG-EXP> != 0 -> [σ(<STA-LIST>); σ(<ASS-EXP_2>)]} ** N || <LOG-EXP> == 0 -> skip)		P0, n = N
 S16 = (σ(<ASS-EXP_1>)) ∧ ({<LOG-EXP> != 0 -> [σ(<STA-LIST>); σ(<ASS-EXP_2>)]} ** (N + 1) || <LOG-EXP> == 0 -> skip)		S14, S15, CI
+
+return : 3.18_re
+	Semantic verify correct
+
+functionStatement : 3_fs
+	Semantic verify correct
 
